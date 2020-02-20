@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"sync"
 
@@ -86,15 +87,22 @@ func (c *ToxicCollection) AddToxicJson(data io.Reader) (*toxics.ToxicWrapper, er
 
 	// Default to a downstream toxic with a toxicity of 1.
 	wrapper := &toxics.ToxicWrapper{
-		Stream:   "downstream",
-		Toxicity: 1.0,
-		Toxic:    new(toxics.NoopToxic),
+		Stream:           "downstream",
+		ApplicableSubnet: "0.0.0.0/0",
+		Toxicity:         1.0,
+		Toxic:            new(toxics.NoopToxic),
 	}
 
 	err := json.NewDecoder(io.TeeReader(data, &buffer)).Decode(wrapper)
 	if err != nil {
 		return nil, joinError(err, ErrBadRequestBody)
 	}
+
+	_, subnet, err := net.ParseCIDR(wrapper.ApplicableSubnet)
+	if err != nil {
+		return nil, joinError(err, ErrInvalidSubnet)
+	}
+	wrapper.Subnet = subnet
 
 	switch strings.ToLower(wrapper.Stream) {
 	case "downstream":
@@ -105,7 +113,12 @@ func (c *ToxicCollection) AddToxicJson(data io.Reader) (*toxics.ToxicWrapper, er
 		return nil, ErrInvalidStream
 	}
 	if wrapper.Name == "" {
-		wrapper.Name = fmt.Sprintf("%s_%s", wrapper.Type, wrapper.Stream)
+		wrapper.Name = fmt.Sprintf(
+			"%s_%s_%s",
+			wrapper.Type,
+			wrapper.Stream,
+			net.IP(wrapper.Subnet.Mask).String(),
+		)
 	}
 
 	if toxics.New(wrapper) == nil {
@@ -169,11 +182,11 @@ func (c *ToxicCollection) RemoveToxic(name string) error {
 	return ErrToxicNotFound
 }
 
-func (c *ToxicCollection) StartLink(name string, input io.Reader, output io.WriteCloser, direction stream.Direction) {
+func (c *ToxicCollection) StartLink(name string, input io.Reader, output io.WriteCloser, direction stream.Direction, remoteAddr net.Addr) {
 	c.Lock()
 	defer c.Unlock()
 
-	link := NewToxicLink(c.proxy, c, direction)
+	link := NewToxicLink(c.proxy, c, direction, remoteAddr)
 	link.Start(name, input, output)
 	c.links[name] = link
 }

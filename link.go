@@ -2,6 +2,7 @@ package toxiproxy
 
 import (
 	"io"
+	"net"
 
 	"github.com/Shopify/toxiproxy/stream"
 	"github.com/Shopify/toxiproxy/toxics"
@@ -18,20 +19,22 @@ import (
 // Input > ToxicStub > ToxicStub > Output
 //
 type ToxicLink struct {
-	stubs     []*toxics.ToxicStub
-	proxy     *Proxy
-	toxics    *ToxicCollection
-	input     *stream.ChanWriter
-	output    *stream.ChanReader
-	direction stream.Direction
+	stubs      []*toxics.ToxicStub
+	proxy      *Proxy
+	toxics     *ToxicCollection
+	input      *stream.ChanWriter
+	output     *stream.ChanReader
+	direction  stream.Direction
+	remoteAddr net.Addr
 }
 
-func NewToxicLink(proxy *Proxy, collection *ToxicCollection, direction stream.Direction) *ToxicLink {
+func NewToxicLink(proxy *Proxy, collection *ToxicCollection, direction stream.Direction, remoteAddr net.Addr) *ToxicLink {
 	link := &ToxicLink{
-		stubs:     make([]*toxics.ToxicStub, len(collection.chain[direction]), cap(collection.chain[direction])),
-		proxy:     proxy,
-		toxics:    collection,
-		direction: direction,
+		stubs:      make([]*toxics.ToxicStub, len(collection.chain[direction]), cap(collection.chain[direction])),
+		proxy:      proxy,
+		toxics:     collection,
+		direction:  direction,
+		remoteAddr: remoteAddr,
 	}
 
 	// Initialize the link with ToxicStubs
@@ -70,7 +73,7 @@ func (link *ToxicLink) Start(name string, source io.Reader, dest io.WriteCloser)
 			link.stubs[i].State = stateful.NewState()
 		}
 
-		go link.stubs[i].Run(toxic)
+		go link.stubs[i].Run(toxic, link.remoteAddr)
 	}
 	go func() {
 		bytes, err := io.Copy(dest, link.output)
@@ -102,8 +105,8 @@ func (link *ToxicLink) AddToxic(toxic *toxics.ToxicWrapper) {
 			link.stubs[i].State = stateful.NewState()
 		}
 
-		go link.stubs[i].Run(toxic)
-		go link.stubs[i-1].Run(link.toxics.chain[link.direction][i-1])
+		go link.stubs[i].Run(toxic, link.remoteAddr)
+		go link.stubs[i-1].Run(link.toxics.chain[link.direction][i-1], link.remoteAddr)
 	} else {
 		// This link is already closed, make sure the new toxic matches
 		link.stubs[i].Output = newin // The real output is already closed, close this instead
@@ -114,7 +117,7 @@ func (link *ToxicLink) AddToxic(toxic *toxics.ToxicWrapper) {
 // Update an existing toxic in the chain.
 func (link *ToxicLink) UpdateToxic(toxic *toxics.ToxicWrapper) {
 	if link.stubs[toxic.Index].InterruptToxic() {
-		go link.stubs[toxic.Index].Run(toxic)
+		go link.stubs[toxic.Index].Run(toxic, link.remoteAddr)
 	}
 }
 
@@ -171,6 +174,6 @@ func (link *ToxicLink) RemoveToxic(toxic *toxics.ToxicWrapper) {
 		link.stubs[i-1].Output = link.stubs[i].Output
 		link.stubs = append(link.stubs[:i], link.stubs[i+1:]...)
 
-		go link.stubs[i-1].Run(link.toxics.chain[link.direction][i-1])
+		go link.stubs[i-1].Run(link.toxics.chain[link.direction][i-1], link.remoteAddr)
 	}
 }

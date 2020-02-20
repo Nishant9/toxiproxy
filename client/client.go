@@ -23,11 +23,12 @@ type Client struct {
 type Attributes map[string]interface{}
 
 type Toxic struct {
-	Name       string     `json:"name"`
-	Type       string     `json:"type"`
-	Stream     string     `json:"stream,omitempty"`
-	Toxicity   float32    `json:"toxicity"`
-	Attributes Attributes `json:"attributes"`
+	Name             string     `json:"name"`
+	Type             string     `json:"type"`
+	Stream           string     `json:"stream,omitempty"`
+	ApplicableSubnet string     `json:"subnet,omitempty"`
+	Toxicity         float32    `json:"toxicity"`
+	Attributes       Attributes `json:"attributes"`
 }
 
 type Toxics []Toxic
@@ -253,8 +254,8 @@ func (proxy *Proxy) Toxics() (Toxics, error) {
 // If a name is not specified, it will default to <type>_<stream>.
 // If a stream is not specified, it will default to downstream.
 // See https://github.com/Shopify/toxiproxy#toxics for a list of all Toxic types.
-func (proxy *Proxy) AddToxic(name, typeName, stream string, toxicity float32, attrs Attributes) (*Toxic, error) {
-	toxic := Toxic{name, typeName, stream, toxicity, attrs}
+func (proxy *Proxy) AddToxic(name, typeName, stream string, toxicity float32, subnet string, attrs Attributes) (*Toxic, error) {
+	toxic := Toxic{name, typeName, stream, subnet, toxicity, attrs}
 	if toxic.Toxicity == -1 {
 		toxic.Toxicity = 1 // Just to be consistent with a toxicity of -1 using the default
 	}

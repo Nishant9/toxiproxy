@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	toxiproxyServer "github.com/Shopify/toxiproxy"
-	"github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/client"
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -139,6 +139,10 @@ func main() {
 						cli.StringFlag{
 							Name:  "toxicity, tox",
 							Usage: "toxicity of toxic",
+						},
+						cli.StringFlag{
+							Name:  "subnet, s",
+							Usage: "subnet where this toxic is applicable",
 						},
 						cli.StringSliceFlag{
 							Name:  "attribute, a",
@@ -411,7 +415,7 @@ func addToxic(c *cli.Context, t *toxiproxy.Client) error {
 	}
 
 	addToxic := func(stream string) error {
-		t, err := p.AddToxic(toxicName, toxicType, stream, toxicity, attributes)
+		t, err := p.AddToxic(toxicName, toxicType, stream, toxicity, c.String("subnet"), attributes)
 		if err != nil {
 			return errorf("Failed to add toxic: %s\n", err.Error())
 		}

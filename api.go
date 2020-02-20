@@ -415,6 +415,7 @@ var (
 	ErrProxyNotFound      = newError("proxy not found", http.StatusNotFound)
 	ErrProxyAlreadyExists = newError("proxy already exists", http.StatusConflict)
 	ErrInvalidStream      = newError("stream was invalid, can be either upstream or downstream", http.StatusBadRequest)
+	ErrInvalidSubnet      = newError("invalid subnet", http.StatusBadRequest)
 	ErrInvalidToxicType   = newError("invalid toxic type", http.StatusBadRequest)
 	ErrToxicAlreadyExists = newError("toxic already exists", http.StatusConflict)
 	ErrToxicNotFound      = newError("toxic not found", http.StatusNotFound)

@@ -2,6 +2,7 @@ package toxics
 
 import (
 	"math/rand"
+	"net"
 	"reflect"
 	"sync"
 
@@ -45,14 +46,16 @@ type StatefulToxic interface {
 }
 
 type ToxicWrapper struct {
-	Toxic      `json:"attributes"`
-	Name       string           `json:"name"`
-	Type       string           `json:"type"`
-	Stream     string           `json:"stream"`
-	Toxicity   float32          `json:"toxicity"`
-	Direction  stream.Direction `json:"-"`
-	Index      int              `json:"-"`
-	BufferSize int              `json:"-"`
+	Toxic            `json:"attributes"`
+	Name             string           `json:"name"`
+	Type             string           `json:"type"`
+	Stream           string           `json:"stream"`
+	ApplicableSubnet string           `json:"subnet"`
+	Toxicity         float32          `json:"toxicity"`
+	Subnet           *net.IPNet       `json:"-"`
+	Direction        stream.Direction `json:"-"`
+	Index            int              `json:"-"`
+	BufferSize       int              `json:"-"`
 }
 
 type ToxicStub struct {
@@ -75,10 +78,10 @@ func NewToxicStub(input <-chan *stream.StreamChunk, output chan<- *stream.Stream
 
 // Begin running a toxic on this stub, can be interrupted.
 // Runs a noop toxic randomly depending on toxicity
-func (s *ToxicStub) Run(toxic *ToxicWrapper) {
+func (s *ToxicStub) Run(toxic *ToxicWrapper, remoteAddr net.Addr) {
 	s.running = make(chan struct{})
 	defer close(s.running)
-	if rand.Float32() < toxic.Toxicity {
+	if rand.Float32() < toxic.Toxicity && toxic.Subnet.Contains(remoteAddr.(*net.TCPAddr).IP) {
 		toxic.Pipe(s)
 	} else {
 		new(NoopToxic).Pipe(s)
